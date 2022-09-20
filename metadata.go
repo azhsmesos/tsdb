@@ -19,8 +19,7 @@ type Metadata struct {
 	Labels       []seriesWithLabel
 }
 
-type binaryMetaserializer struct {
-}
+type binaryMetaserializer struct{}
 
 // MetaSerializer 编解码Segment元数据
 type MetaSerializer interface {

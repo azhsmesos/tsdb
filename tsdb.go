@@ -2,8 +2,15 @@ package tsdb
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/sirupsen/logrus"
+	"io/fs"
+	"io/ioutil"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -68,11 +75,30 @@ type Row struct {
 
 type Option func(c *options)
 
-func OpenTSDB(opts ...Option) {
+const (
+	defaultQueueSize = 512
+)
+
+func OpenTSDB(opts ...Option) *TSDB {
 	for _, opt := range opts {
 		opt(defaultOpts)
 	}
 
+	db := &TSDB{
+		segments: newSegmentList(),
+		queue:    make(chan []*Row, defaultQueueSize),
+	}
+
+	// 加载文件
+	db.loadFiles()
+
+	worker := runtime.GOMAXPROCS(-1)
+	db.ctx, db.cancel = context.WithCancel(context.Background())
+	for i := 0; i < worker; i++ {
+		// 刷盘
+		go db.saveRows(db.ctx)
+	}
+	return db
 }
 
 // InsertRows 插入rows
@@ -107,4 +133,61 @@ func putTimer(t *time.Timer) {
 		default:
 		}
 	}
+}
+
+func (db *TSDB) loadFiles() {
+	mkdir(defaultOpts.dataPath)
+	err := filepath.Walk(defaultOpts.dataPath, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to traverse the dir: %s, err: %v", path, err)
+		}
+		// 文件后续都是默认以seg开头
+		if !info.IsDir() || !strings.HasPrefix(info.Name(), "seg-") {
+			return nil
+		}
+
+		files, err := ioutil.ReadDir(filepath.Join(defaultOpts.dataPath, info.Name()))
+		if err != nil {
+			return fmt.Errorf("failed to load the data storage, err: %v", err)
+		}
+
+		// 从磁盘加载出最近的segment数据进入内存
+		nowDiskSegment := &diskSegment{}
+		for _, file := range files {
+			filename := filepath.Join(defaultOpts.dataPath, info.Name(), file.Name())
+			if strings.EqualFold(file.Name(), "data") {
+				mmapFile, err := OpenMMapFile(filename)
+				if err != nil {
+					return fmt.Errorf("failed to open mmap file %s, err: %v", filename, err)
+				}
+				nowDiskSegment.dataFd = mmapFile
+				nowDiskSegment.dataFilename = filename
+				nowDiskSegment.labelVs = newLabelValueList()
+			}
+
+			if strings.EqualFold(file.Name(), "meta") {
+				data, err := ioutil.ReadFile(filename)
+				if err != nil {
+					return fmt.Errorf("failed to read file: %s, err: %v", filename, err)
+				}
+				// 构造meta文件数据格式
+				desc := Desc{}
+				if err = json.Unmarshal(data, &desc); err != nil {
+					return fmt.Errorf("failed to json unmarshal meta file: %v", err)
+				}
+				nowDiskSegment.minTimestamp = desc.MinTimestamp
+				nowDiskSegment.maxTimestamp = desc.MaxTimestamp
+			}
+		}
+		db.segments.Add(nowDiskSegment)
+		return nil
+	})
+
+	if err != nil {
+		logrus.Error(err)
+	}
+}
+
+func (db *TSDB) saveRows(ctx context.Context) {
+
 }
