@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cespare/xxhash"
 	"github.com/sirupsen/logrus"
 	"io/fs"
 	"io/ioutil"
@@ -43,14 +44,6 @@ type Point struct {
 	Value     float64
 }
 
-// Label 一个标签组合
-type Label struct {
-	Name  string
-	Value string
-}
-
-type LabelList []Label
-
 var (
 	timerPool   sync.Pool
 	defaultOpts = &options{
@@ -77,6 +70,7 @@ type Option func(c *options)
 
 const (
 	defaultQueueSize = 512
+	separator        = "/-/"
 )
 
 func OpenTSDB(opts ...Option) *TSDB {
@@ -189,5 +183,38 @@ func (db *TSDB) loadFiles() {
 }
 
 func (db *TSDB) saveRows(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case rows := <-db.queue:
+			head, err := db.writeColdSegment()
+			if err != nil {
+				logrus.Errorf("failed to write cold data to disk: %v, err: %v", head, err)
+				continue
+			}
+			head.InsertRows(rows)
+		}
+	}
+}
 
+func (db *TSDB) writeColdSegment() (Segment, error) {
+	db.mutex.Lock()
+	defer db.mutex.Unlock()
+
+	return nil, nil
+}
+
+func (row Row) ID() string {
+	return joinSeprator(xxhash.Sum64([]byte(row.Metric)), row.Labels.Hash())
+}
+
+func joinSeprator(a, b interface{}) string {
+	return fmt.Sprintf("%v%s%v", a, separator, b)
+}
+
+func GetDataPath(dataPath string) Option {
+	return func(c *options) {
+		c.dataPath = dataPath
+	}
 }

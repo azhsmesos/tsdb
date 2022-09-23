@@ -27,3 +27,23 @@ func TestAVLTree(t *testing.T) {
 		fmt.Println(iter.Value().(string))
 	}
 }
+
+func TestRowLabelsHash(t *testing.T) {
+	row := &Row{
+		Metric: "cpu.busy",
+		Labels: []Label{
+			{Name: "node", Value: "vm1"},
+			{Name: "dc", Value: "gz-idc"},
+		},
+		Point: Point{Timestamp: 1600000001, Value: 0.1},
+	}
+
+	res := row.Labels.Hash()
+	fmt.Println(res)
+}
+
+func TestOpenDB(t *testing.T) {
+	tmpDir := "temp1/tsdb1"
+	store := OpenTSDB(GetDataPath(tmpDir))
+	fmt.Println(store)
+}

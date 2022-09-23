@@ -20,6 +20,10 @@ type Desc struct {
 	MinTimestamp    int64 `json:"minTimestamp"`
 }
 
+const (
+	metricName = "__name__"
+)
+
 func newSegmentList() *segmentList {
 	return &segmentList{
 		head: newMemtable(),

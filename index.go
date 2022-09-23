@@ -34,3 +34,27 @@ func newMemtableIndexMap() *memtableIndexMap {
 		index: make(map[string]*memtableSidList),
 	}
 }
+
+func newMemtableSidList() *memtableSidList {
+	return &memtableSidList{
+		container: make(map[string]struct{}),
+	}
+}
+
+func (mim *memtableIndexMap) UpdateIndex(sid string, labels LabelList) {
+	mim.mutex.Lock()
+	defer mim.mutex.Unlock()
+	for _, label := range labels {
+		key := label.MarshalName()
+		if _, ok := mim.index[key]; !ok {
+			mim.index[key] = newMemtableSidList()
+		}
+		mim.index[key].Add(sid)
+	}
+}
+
+func (msl *memtableSidList) Add(sid string) {
+	msl.mutex.Lock()
+	defer msl.mutex.Unlock()
+	msl.container[sid] = struct{}{}
+}

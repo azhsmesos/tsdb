@@ -4,6 +4,8 @@ go 1.18
 
 require (
 	github.com/RoaringBitmap/roaring v1.2.1
+	github.com/cespare/xxhash v1.1.0
+	github.com/dgryski/go-tsz v0.0.0-20180227144327-03b7d791f4fe
 	github.com/golang/snappy v0.0.4
 	github.com/klauspost/compress v1.15.10
 	github.com/sirupsen/logrus v1.9.0
