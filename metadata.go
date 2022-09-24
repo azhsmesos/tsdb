@@ -13,13 +13,21 @@ type seriesWithLabel struct {
 }
 
 type Metadata struct {
-	MinTimestamp int64
-	MaxTimestamp int64
-	Series       []metaSeries
-	Labels       []seriesWithLabel
+	MinTimestamp          int64
+	MaxTimestamp          int64
+	Series                []metaSeries
+	Labels                []seriesWithLabel
+	SeriesIDRelatedLabels []LabelList
 }
 
 type binaryMetaserializer struct{}
+
+const (
+	endOfBlock uint16 = 0xffff
+	uint16Size        = 2
+	uint32Size        = 4
+	uint64Size        = 8
+)
 
 // MetaSerializer 编解码Segment元数据
 type MetaSerializer interface {
@@ -37,4 +45,12 @@ func (b *binaryMetaserializer) Marshal(meta Metadata) ([]byte, error) {
 
 func (b *binaryMetaserializer) Unmarshal(data []byte, meta *Metadata) error {
 	return nil
+}
+
+func MarshalMeta(meta Metadata) ([]byte, error) {
+	return defaultOpts.metaSerializer.Marshal(meta)
+}
+
+func UnmarshaMeta(data []byte, meta *Metadata) error {
+	return defaultOpts.metaSerializer.Unmarshal(data, meta)
 }

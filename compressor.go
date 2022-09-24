@@ -29,6 +29,14 @@ type BytesCompressor interface {
 	Decompress(data []byte) ([]byte, error)
 }
 
+func DoCompress(data []byte) []byte {
+	return defaultOpts.bytesCompressor.Compress(data)
+}
+
+func DoDecompress(data []byte) ([]byte, error) {
+	return defaultOpts.bytesCompressor.Decompress(data)
+}
+
 //  默认压缩算法
 
 func newNoopBytesCompressor() BytesCompressor {

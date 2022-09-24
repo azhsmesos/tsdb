@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io/fs"
 	"io/ioutil"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -201,12 +202,43 @@ func (db *TSDB) saveRows(ctx context.Context) {
 func (db *TSDB) writeColdSegment() (Segment, error) {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
-
-	return nil, nil
+	if db.segments.head.Frozen() {
+		head := db.segments.head
+		go func() {
+			db.wait.Add(1)
+			defer db.wait.Done()
+			db.segments.Add(head)
+			startTime := time.Now()
+			dirname := makeDirName(head.MinTs(), head.MaxTs())
+			if err := writeToDisk(head.(*memtable)); err != nil {
+				logrus.Errorf("faild to flush data to disk, %v", err)
+				return
+			}
+			filename := path.Join(dirname, "data")
+			mmapFile, err := OpenMMapFile(filename)
+			if err != nil {
+				logrus.Errorf("failed to make a mmap file %s, %v", filename, err)
+				return
+			}
+			// 将diskSegment添加进入tree，方便查询
+			err = db.segments.Replace(head, newDiskSegment(mmapFile, dirname, head.MinTs(), head.MaxTs()))
+			if err != nil {
+				logrus.Errorf("add diskSegment into in list error: %v", err)
+				return
+			}
+			logrus.Infof("write file %s take: %v", filename, time.Since(startTime))
+		}()
+		db.segments.head = newMemtable()
+	}
+	return db.segments.head, nil
 }
 
 func (row Row) ID() string {
 	return joinSeprator(xxhash.Sum64([]byte(row.Metric)), row.Labels.Hash())
+}
+
+func makeDirName(a, b int64) string {
+	return path.Join(defaultOpts.dataPath, fmt.Sprintf("seg-%d-%d", a, b))
 }
 
 func joinSeprator(a, b interface{}) string {

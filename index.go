@@ -58,3 +58,22 @@ func (msl *memtableSidList) Add(sid string) {
 	defer msl.mutex.Unlock()
 	msl.container[sid] = struct{}{}
 }
+
+func (mim *memtableIndexMap) Range(fun func(key string, value *memtableSidList)) {
+	mim.mutex.Lock()
+	defer mim.mutex.Unlock()
+
+	for key, sidLsit := range mim.index {
+		fun(key, sidLsit)
+	}
+}
+
+func (msl *memtableSidList) List() []string {
+	msl.mutex.Lock()
+	defer msl.mutex.Unlock()
+	keys := make([]string, 0, len(msl.container))
+	for k := range msl.container {
+		keys = append(keys, k)
+	}
+	return keys
+}

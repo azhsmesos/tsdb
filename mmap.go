@@ -50,3 +50,20 @@ func syscallMmap(file *os.File, length int) ([]byte, error) {
 func syscallMunmap(data []byte) (err error) {
 	return unix.Munmap(data)
 }
+
+func (mmapFile *MMapFile) Close() error {
+	err := syscallMunmap(mmapFile.data)
+	err2 := mmapFile.file.Close()
+	if err != nil {
+		return err
+	}
+	return err2
+}
+
+func (mmapFile *MMapFile) File() *os.File {
+	return mmapFile.file
+}
+
+func (mmapFile *MMapFile) Bytes() []byte {
+	return mmapFile.data
+}
