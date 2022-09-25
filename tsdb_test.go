@@ -2,6 +2,7 @@ package tsdb
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -42,8 +43,59 @@ func TestRowLabelsHash(t *testing.T) {
 	fmt.Println(res)
 }
 
-func TestOpenDB(t *testing.T) {
+var metrics = []string{
+	"cpu.busy", "cpu.load1", "cpu.load5", "cpu.load15", "cpu.iowait",
+	"disk.write.ops", "disk.read.ops", "disk.used",
+	"net.in.bytes", "net.out.bytes", "net.in.packages", "net.out.packages",
+	"mem.used", "mem.idle", "mem.used.bytes", "mem.total.bytes",
+}
+
+func genPoints(ts int64, node, dc int) []*Row {
+	points := make([]*Row, 0)
+	for _, metric := range metrics {
+		points = append(points, &Row{
+			Metric: metric,
+			Labels: []Label{
+				{Name: "node", Value: "vm" + strconv.Itoa(node)},
+				{Name: "dc", Value: strconv.Itoa(dc)},
+			},
+			Point: Point{Timestamp: ts, Value: float64(ts)},
+		})
+	}
+
+	return points
+}
+
+func TestInsertRow(t *testing.T) {
+	var start int64 = 1000000000
 	tmpDir := "temp1/tsdb1"
 	store := OpenTSDB(GetDataPath(tmpDir))
+	var now = start
+	for i := 0; i < 720; i++ {
+		for n := 0; n < 3; n++ {
+			for j := 0; j < 24; j++ {
+				_ = store.InsertRows(genPoints(now, n, j))
+			}
+		}
+
+		now += 60 //1min
+	}
+}
+
+func TestOpenDB(t *testing.T) {
+
+	tmpDir := "temp1/tsdb1"
+	store := OpenTSDB(GetDataPath(tmpDir))
+	row := &Row{
+		Metric: "cpu.busy",
+		Labels: []Label{
+			{Name: "node", Value: "vm1"},
+			{Name: "dc", Value: "gz-idc"},
+		},
+		Point: Point{Timestamp: 1600000001, Value: 0.1},
+	}
+	rows := make([]*Row, 0)
+	rows = append(rows, row)
+	_ = store.InsertRows(rows)
 	fmt.Println(store)
 }
