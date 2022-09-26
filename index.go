@@ -41,6 +41,34 @@ func newMemtableSidList() *memtableSidList {
 	}
 }
 
+func newDiskIndexMap(swls []seriesWithLabel) *diskIndexMap {
+	dim := &diskIndexMap{
+		label2sids:   make(map[string]*diskSidList),
+		labelOrdered: make(map[int]string),
+	}
+	for i := range swls {
+		row := swls[i]
+		dim.label2sids[row.Name] = newDiskSidList()
+		for _, sid := range swls[i].Sids {
+			dim.label2sids[row.Name].Add(sid)
+		}
+		dim.labelOrdered[i] = row.Name
+	}
+	return dim
+}
+
+func newDiskSidList() *diskSidList {
+	return &diskSidList{
+		list: roaring.New(),
+	}
+}
+
+func (dsl *diskSidList) Add(value uint32) {
+	dsl.mutex.Lock()
+	defer dsl.mutex.Unlock()
+	dsl.list.Add(value)
+}
+
 func (mim *memtableIndexMap) UpdateIndex(sid string, labels LabelList) {
 	mim.mutex.Lock()
 	defer mim.mutex.Unlock()

@@ -34,13 +34,28 @@ func newLabelValueList() *labelValueList {
 	}
 }
 
-func (lvs *labelValueList) Set(label, value string) {
-	lvs.mutex.Lock()
-	defer lvs.mutex.Unlock()
-	if _, ok := lvs.values[label]; !ok {
-		lvs.values[label] = make(map[string]struct{})
+func (lvl *labelValueList) Set(label, value string) {
+	lvl.mutex.Lock()
+	defer lvl.mutex.Unlock()
+	if _, ok := lvl.values[label]; !ok {
+		lvl.values[label] = make(map[string]struct{})
 	}
-	lvs.values[label][value] = struct{}{}
+	lvl.values[label][value] = struct{}{}
+}
+
+func (lvl *labelValueList) Get(label string) []string {
+	lvl.mutex.Lock()
+	defer lvl.mutex.Unlock()
+
+	ret := make([]string, 0)
+	values, ok := lvl.values[label]
+	if !ok {
+		return ret
+	}
+	for key := range values {
+		ret = append(ret, key)
+	}
+	return ret
 }
 
 func (ll *LabelList) AddMetric(metric string) LabelList {
@@ -101,4 +116,12 @@ func (ll LabelList) Hash() uint64 {
 
 func (l Label) MarshalName() string {
 	return joinSeprator(l.Name, l.Value)
+}
+
+func UnmarshalLabelName(s string) (string, string) {
+	res := strings.SplitN(s, separator, 2)
+	if len(res) != 2 {
+		return "", ""
+	}
+	return res[0], res[1]
 }

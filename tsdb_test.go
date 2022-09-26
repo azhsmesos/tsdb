@@ -2,6 +2,7 @@ package tsdb
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
 	"testing"
@@ -44,9 +45,8 @@ func TestRowLabelsHash(t *testing.T) {
 }
 
 var metrics = []string{
-	"cpu.busy", "cpu.load1", "cpu.load5", "cpu.load15", "cpu.iowait",
-	"disk.write.ops", "disk.read.ops", "disk.used",
-	"net.in.bytes", "net.out.bytes", "net.in.packages", "net.out.packages",
+	"cpu.busy", "disk.used",
+	"net.in.bytes", "net.out.bytes",
 	"mem.used", "mem.idle", "mem.used.bytes", "mem.total.bytes",
 }
 
@@ -56,8 +56,8 @@ func genPoints(ts int64, node, dc int) []*Row {
 		points = append(points, &Row{
 			Metric: metric,
 			Labels: []Label{
-				{Name: "node", Value: "vm" + strconv.Itoa(node)},
-				{Name: "dc", Value: strconv.Itoa(dc)},
+				{Name: "node", Value: "vm_node_azh" + strconv.Itoa(node)},
+				{Name: "computer", Value: strconv.Itoa(dc)},
 			},
 			Point: Point{Timestamp: ts, Value: float64(ts)},
 		})
@@ -80,6 +80,14 @@ func TestInsertRow(t *testing.T) {
 
 		now += 60 //1min
 	}
+
+	queryLabelValues(store)
+}
+
+func queryLabelValues(store *TSDB) {
+
+	lvs := store.QueryLabelValues("node", 1000000000, 1100000002)
+	logrus.Infof("data: %+v\n", lvs)
 }
 
 func TestOpenDB(t *testing.T) {

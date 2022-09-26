@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -107,6 +108,24 @@ func (tsdb *TSDB) InsertRows(rows []*Row) error {
 		return errors.New("failed to insert rows to database, write overload")
 	}
 	return nil
+}
+
+// QueryLabelValues 查询标签值
+func (db *TSDB) QueryLabelValues(label string, start, end int64) []string {
+	temp := make(map[string]struct{})
+	for _, segment := range db.segments.Get(start, end) {
+		segment = segment.Load()
+		values := segment.QueryLabelValuse(label)
+		for i := 0; i < len(values); i++ {
+			temp[values[i]] = struct{}{}
+		}
+	}
+	ret := make([]string, 0, len(temp))
+	for key := range temp {
+		ret = append(ret, key)
+	}
+	sort.Strings(ret)
+	return ret
 }
 
 func getTimer(duration time.Duration) *time.Timer {

@@ -97,6 +97,14 @@ func (m *memtable) Cleanup() error {
 	return nil
 }
 
+func (m *memtable) Load() Segment {
+	return m
+}
+
+func (m *memtable) QueryLabelValuse(label string) []string {
+	return m.labelVs.Get(label)
+}
+
 func mkdir(dir string) {
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		return

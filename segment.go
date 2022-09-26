@@ -12,6 +12,8 @@ type Segment interface {
 	Frozen() bool
 	Close() error
 	Cleanup() error
+	Load() Segment
+	QueryLabelValuse(label string) []string
 }
 
 type segmentList struct {
@@ -61,4 +63,36 @@ func (s *segmentList) Replace(pre, next Segment) error {
 func isFileExist(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
+}
+
+func (s *segmentList) Get(start, end int64) []Segment {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	segments := make([]Segment, 0)
+	iter := s.list.All()
+	for iter.Next() {
+		segment := iter.Value().(Segment)
+		if s.Scope(segment, start, end) {
+			segments = append(segments, segment)
+		}
+	}
+	if s.Scope(s.head, start, end) {
+		segments = append(segments, s.head)
+	}
+	return segments
+}
+
+func (s *segmentList) Scope(segment Segment, start, end int64) bool {
+	if segment.MinTs() < start && segment.MaxTs() > start {
+		return true
+	}
+
+	if segment.MinTs() > start && segment.MaxTs() < end {
+		return true
+	}
+
+	if segment.MinTs() < end && segment.MaxTs() > end {
+		return true
+	}
+	return false
 }
